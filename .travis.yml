@@ -16,6 +16,7 @@ install:
     - sudo apt-get install $PYTHON-scipy
     - sudo apt-get install $PYTHON-setuptools
     - sudo apt-get install $PYTHON-nose
+    - sudo apt-get install $PYTHON-sphinx
     - sudo easy_install$PYSUF pip
     - sudo pip-$PYVER install cython
     - sudo apt-get install libfreeimage3
@@ -37,4 +38,8 @@ script:
     # Change back to repository root directory and run all doc examples
     - cd ..
     - for f in doc/examples/*.py; do $PYTHON "$f"; if [ $? -ne 0 ]; then exit 1; fi done
+    # run sphinx
+    - ls -l
+    - cd doc
+    - make html
     - flake8 --exit-zero --exclude=test_*,six.py skimage doc/examples viewer_examples
