@@ -9,7 +9,8 @@ cimport cython
 from libc.math cimport cos, sin, floor, ceil, sqrt, abs, M_PI
 
 
-cpdef bilinear_ray_sum(cnp.double_t[:, ::1] image, cnp.double_t theta,
+cpdef bilinear_ray_sum(cnp.double_t[:, ::1] image,
+                       cnp.uint8_t[:, ::1] image_mask, cnp.double_t theta,
                        cnp.double_t ray_position):
     """
     Compute the projection of an image along a ray.
@@ -69,23 +70,24 @@ cpdef bilinear_ray_sum(cnp.double_t[:, ::1] image, cnp.double_t theta,
             if i > 0 and j > 0:
                 weight = (1. - di) * (1. - dj) * ds
                 ray_sum += weight * image[i, j]
-                weight_norm += weight**2
+                weight_norm += weight**2 * (1 - image_mask[i, j])
             if i > 0 and j < image.shape[1] - 1:
                 weight = (1. - di) * dj * ds
                 ray_sum += weight * image[i, j+1]
-                weight_norm += weight**2
+                weight_norm += weight**2 * (1 - image_mask[i, j+1])
             if i < image.shape[0] - 1 and j > 0:
                 weight = di * (1 - dj) * ds
                 ray_sum += weight * image[i+1, j]
-                weight_norm += weight**2
+                weight_norm += weight**2 * (1 - image_mask[i+1, j])
             if i < image.shape[0] - 1 and j < image.shape[1] - 1:
                 weight = di * dj * ds
                 ray_sum += weight * image[i+1, j+1]
-                weight_norm += weight**2
+                weight_norm += weight**2 * (1 - image_mask[i+1, j+1])
     return ray_sum, weight_norm
 
 
 cpdef bilinear_ray_update(cnp.double_t[:, ::1] image,
+                          cnp.uint8_t[:, ::1] image_mask,
                           cnp.double_t[:, ::1] image_update,
                           cnp.double_t theta, cnp.double_t ray_position,
                           cnp.double_t projected_value):
@@ -111,7 +113,8 @@ cpdef bilinear_ray_update(cnp.double_t[:, ::1] image,
         Deviation before updating the image
     """
     cdef cnp.double_t ray_sum, weight_norm, deviation
-    ray_sum, weight_norm = bilinear_ray_sum(image, theta, ray_position)
+    ray_sum, weight_norm = bilinear_ray_sum(image, image_mask,
+                                            theta, ray_position)
     if weight_norm > 0.:
         deviation = -(ray_sum - projected_value) / weight_norm
     else:
@@ -152,21 +155,26 @@ cpdef bilinear_ray_update(cnp.double_t[:, ::1] image,
                               - hamming_beta * cos(2 * M_PI * k / (Ns - 1)))
             if i > 0 and j > 0:
                 image_update[i, j] += (deviation * (1. - di) * (1. - dj)
-                                       * ds * hamming_window)
+                                       * ds * hamming_window
+                                       * (1 - image_mask[i, j]))
             if i > 0 and j < image.shape[1] - 1:
                 image_update[i, j+1] += (deviation * (1. - di) * dj
-                                         * ds * hamming_window)
+                                         * ds * hamming_window
+                                         * (1 - image_mask[i, j+1]))
             if i < image.shape[0] - 1 and j > 0:
                 image_update[i+1, j] += (deviation * di * (1 - dj)
-                                         * ds * hamming_window)
+                                         * ds * hamming_window
+                                         * (1 - image_mask[i+1, j]))
             if i < image.shape[0] - 1 and j < image.shape[1] - 1:
                 image_update[i+1, j+1] += (deviation * di * dj
-                                           * ds * hamming_window)
+                                           * ds * hamming_window
+                                           * (1 - image_mask[i+1, j+1]))
     return deviation
 
 
 @cython.boundscheck(True)
 def sart_projection_update(cnp.double_t[:, ::1] image not None,
+                           cnp.uint8_t[:, ::1] image_mask not None,
                            cnp.double_t theta,
                            cnp.double_t[::1] projection not None,
                            cnp.double_t projection_shift=0.):
@@ -198,6 +206,6 @@ def sart_projection_update(cnp.double_t[:, ::1] image not None,
     cdef Py_ssize_t i
     for i in range(projection.shape[0]):
         ray_position = i + projection_shift
-        bilinear_ray_update(image, image_update, theta, ray_position,
-                            projection[i])
+        bilinear_ray_update(image, image_mask, image_update, theta,
+                            ray_position, projection[i])
     return image_update

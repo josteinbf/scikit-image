@@ -396,12 +396,16 @@ def iradon_sart(radon_image, theta=None, image=None, projection_shifts=None,
                          'number of projections (%d)'
                          % (projection_shifts.shape, radon_image.shape[1]))
     if image is None:
+        image_mask = np.zeros(reconstructed_shape, dtype=np.uint8, order='C')
         image = np.zeros(reconstructed_shape, dtype=np.float, order='C')
     elif image.shape != reconstructed_shape:
         raise ValueError('Shape of image (%s) does not match first dimension '
                          'of radon_image (%s)'
                          % (image.shape, reconstructed_shape))
     else:
+        image_mask = (np.require(image.mask, np.uint8, 'C')
+                      if np.ma.isMaskedArray(image)
+                      else np.zeros_like(image, dtype=np.uint8, order='C'))
         image = np.require(image, np.double, 'C')
     if projection_shifts is None:
         projection_shifts = np.zeros((radon_image.shape[1],), dtype=np.float)
@@ -417,7 +421,8 @@ def iradon_sart(radon_image, theta=None, image=None, projection_shifts=None,
 
     for angle_index in order_angles_golden_ratio(theta):
         projection = np.require(radon_image[:, angle_index], np.double, 'C')
-        image_update = sart_projection_update(image, theta[angle_index],
+        image_update = sart_projection_update(image, image_mask,
+                                              theta[angle_index],
                                               projection,
                                               projection_shifts[angle_index])
         image += relaxation * image_update
