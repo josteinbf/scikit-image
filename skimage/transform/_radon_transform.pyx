@@ -9,7 +9,7 @@ cimport cython
 from libc.math cimport cos, sin, floor, ceil, sqrt, abs, M_PI
 
 
-cpdef bilinear_ray_sum(cnp.double_t[:, :] image, cnp.double_t theta,
+cpdef bilinear_ray_sum(cnp.double_t[:, ::1] image, cnp.double_t theta,
                        cnp.double_t ray_position):
     """
     Compute the projection of an image along a ray.
@@ -85,8 +85,8 @@ cpdef bilinear_ray_sum(cnp.double_t[:, :] image, cnp.double_t theta,
     return ray_sum, weight_norm
 
 
-cpdef bilinear_ray_update(cnp.double_t[:, :] image,
-                          cnp.double_t[:, :] image_update,
+cpdef bilinear_ray_update(cnp.double_t[:, ::1] image,
+                          cnp.double_t[:, ::1] image_update,
                           cnp.double_t theta, cnp.double_t ray_position,
                           cnp.double_t projected_value):
     """
@@ -166,9 +166,9 @@ cpdef bilinear_ray_update(cnp.double_t[:, :] image,
 
 
 @cython.boundscheck(True)
-def sart_projection_update(cnp.double_t[:, :] image not None,
+def sart_projection_update(cnp.double_t[:, ::1] image not None,
                            cnp.double_t theta,
-                           cnp.double_t[:] projection not None,
+                           cnp.double_t[::1] projection not None,
                            cnp.double_t projection_shift=0.):
     """
     Compute update to a reconstruction estimate from a single projection
@@ -192,7 +192,8 @@ def sart_projection_update(cnp.double_t[:, :] image not None,
         Array of same shape as ``image`` containing updates that should be
         added to ``image`` to improve the reconstruction estimate
     """
-    cdef cnp.ndarray[cnp.double_t, ndim=2] image_update = np.zeros_like(image)
+    cdef cnp.ndarray[cnp.double_t, ndim=2] image_update = \
+        np.zeros_like(image, order='C')
     cdef cnp.double_t ray_position
     cdef Py_ssize_t i
     for i in range(projection.shape[0]):
